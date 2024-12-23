@@ -218,7 +218,7 @@ function combineStaticAndRealtime(staticData, realtimeData) {
                 }
             };
         });
-
+        console.log(`toto ${combinedData}`);
         console.log(`Données combinées pour ${combinedData.length} arrêts`);
         return combinedData;
     } catch (error) {
