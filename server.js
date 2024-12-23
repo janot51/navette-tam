@@ -117,41 +117,47 @@ function parseGTFSData(stopTimes, routes) {
 
         console.log('Nombre total de routes:', parsedRoutes.length);
         console.log('Nombre total d\'horaires:', parsedStopTimes.length);
-        
-        // Afficher toutes les routes pour debug
-        parsedRoutes.forEach(route => {
-            console.log(`Route ID: ${route.route_id}, Nom: ${route.route_short_name} - ${route.route_long_name}`);
-        });
 
-        // Trouver la Navette A (ID: 4-13)
+        // Trouver la Navette A
         const navetteARoute = parsedRoutes.find(route => route.route_id === '4-13');
 
         if (!navetteARoute) {
-            console.log('ERREUR: Navette A (ID: 4-13) non trouvée dans les routes');
+            console.log('ERREUR: Navette A non trouvée');
             return [];
         }
 
         console.log('Navette A trouvée:', navetteARoute);
 
-        // Filtrer les horaires pour la Navette A
-        const navetteAStopTimes = parsedStopTimes.filter(stopTime => 
-            stopTime.trip_id.startsWith('4-13')
-        );
+        // Afficher un échantillon des horaires pour debug
+        console.log('Échantillon des horaires:');
+        parsedStopTimes.slice(0, 5).forEach(stop => {
+            console.log('Horaire:', stop);
+        });
+
+        // Filtrer les horaires différemment
+        const navetteAStopTimes = parsedStopTimes.filter(stopTime => {
+            const isNavetteA = stopTime.trip_id && stopTime.trip_id.includes('13');
+            if (isNavetteA) {
+                console.log('Horaire trouvé:', stopTime);
+            }
+            return isNavetteA;
+        });
 
         console.log(`Nombre d'horaires trouvés pour la Navette A: ${navetteAStopTimes.length}`);
-        
-        if (navetteAStopTimes.length === 0) {
-            console.log('ERREUR: Aucun horaire trouvé pour la Navette A');
-            return [];
-        }
+
+        // Renvoyer les horaires triés par heure
+        const sortedStopTimes = navetteAStopTimes.sort((a, b) => {
+            return a.arrival_time.localeCompare(b.arrival_time);
+        });
 
         return {
             routeId: '4-13',
             routeName: navetteARoute.route_long_name,
-            stopTimes: navetteAStopTimes
+            stopTimes: sortedStopTimes
         };
     } catch (error) {
         console.error('Erreur détaillée lors du parsing GTFS:', error);
+        console.error('Stack:', error.stack);
         return [];
     }
 }
