@@ -92,18 +92,22 @@ async function loadRealtimeData() {
 
 // Endpoint pour obtenir les horaires combinés
 app.get('/api/schedule', (req, res) => {
-  console.log('Requête reçue sur /api/schedule');
-  if (!staticSchedules || !realtimeData) {
-    console.log('Données non disponibles');
-    return res.status(503).json({ error: 'Données non disponibles' });
-  }
+    console.log('Requête reçue sur /api/schedule');
+    if (!staticSchedules || !realtimeData) {
+        console.log('Données manquantes:', {
+            staticSchedules: !!staticSchedules,
+            realtimeData: !!realtimeData
+        });
+        return res.status(503).json({ error: 'Données non disponibles' });
+    }
 
-  const combinedData = combineStaticAndRealtime(staticSchedules, realtimeData);
-  console.log('Données combinées envoyées');
-  res.json(combinedData);
+    const combinedData = combineStaticAndRealtime(staticSchedules, realtimeData);
+    console.log('Données à envoyer:', combinedData);
+    res.json(combinedData);
 });
 
 // Fonctions utilitaires
+// Dans la fonction parseGTFSData
 function parseGTFSData(stopTimes, routes) {
     console.log('Parsing des données GTFS...');
     try {
@@ -111,26 +115,34 @@ function parseGTFSData(stopTimes, routes) {
         const parsedStopTimes = Papa.parse(stopTimes, { header: true, skipEmptyLines: true }).data;
         const parsedRoutes = Papa.parse(routes, { header: true, skipEmptyLines: true }).data;
 
-        // Trouver la Navette A avec son ID exact
+        console.log('Nombre total de routes:', parsedRoutes.length);
+        console.log('Nombre total d\'horaires:', parsedStopTimes.length);
+        
+        // Afficher toutes les routes pour debug
+        parsedRoutes.forEach(route => {
+            console.log(`Route ID: ${route.route_id}, Nom: ${route.route_short_name} - ${route.route_long_name}`);
+        });
+
+        // Trouver la Navette A (ID: 4-13)
         const navetteARoute = parsedRoutes.find(route => route.route_id === '4-13');
 
         if (!navetteARoute) {
-            console.log('Navette A (ID: 4-13) non trouvée dans les routes');
-            return {};
+            console.log('ERREUR: Navette A (ID: 4-13) non trouvée dans les routes');
+            return [];
         }
 
-        console.log('Navette A trouvée:', navetteARoute.route_long_name);
+        console.log('Navette A trouvée:', navetteARoute);
 
         // Filtrer les horaires pour la Navette A
         const navetteAStopTimes = parsedStopTimes.filter(stopTime => 
             stopTime.trip_id.startsWith('4-13')
         );
 
-        // Afficher quelques informations utiles
-        if (navetteAStopTimes.length > 0) {
-            console.log(`Trouvé ${navetteAStopTimes.length} horaires pour la Navette A`);
-            console.log('Premier horaire:', navetteAStopTimes[0]);
-            console.log('Dernier horaire:', navetteAStopTimes[navetteAStopTimes.length - 1]);
+        console.log(`Nombre d'horaires trouvés pour la Navette A: ${navetteAStopTimes.length}`);
+        
+        if (navetteAStopTimes.length === 0) {
+            console.log('ERREUR: Aucun horaire trouvé pour la Navette A');
+            return [];
         }
 
         return {
@@ -139,8 +151,8 @@ function parseGTFSData(stopTimes, routes) {
             stopTimes: navetteAStopTimes
         };
     } catch (error) {
-        console.error('Erreur lors du parsing GTFS:', error);
-        return {};
+        console.error('Erreur détaillée lors du parsing GTFS:', error);
+        return [];
     }
 }
 
