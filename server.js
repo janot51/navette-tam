@@ -78,28 +78,31 @@ function parseGTFSData(stopTimes, routes) {
         const parsedStopTimes = Papa.parse(stopTimes, { 
             header: true, 
             skipEmptyLines: true,
-            dynamicTyping: true 
+            dynamicTyping: false  // Changé à false pour garder les strings
         }).data;
 
         console.log('Échantillon des données parsées:', parsedStopTimes.slice(0, 5));
-        console.log('Nombre total de stop times:', parsedStopTimes.length);
+        console.log('Colonnes disponibles:', Object.keys(parsedStopTimes[0]));
 
-        // Voir tous les stop_id uniques pour vérifier
-        const uniqueStopIds = [...new Set(parsedStopTimes.map(trip => trip.stop_id))];
-        console.log('Stop IDs uniques:', uniqueStopIds);
+        // Vérifier le type des stop_id
+        const sampleStopId = parsedStopTimes[0].stop_id;
+        console.log('Type de stop_id:', typeof sampleStopId);
+        console.log('Exemple de stop_id:', sampleStopId);
 
-        // Filtrer avec des logs
+        // Filtrer avec des logs plus détaillés
         const filteredTrips = parsedStopTimes.filter(trip => {
-            if (trip.stop_id === 264) {
-                console.log('Trouvé trip pour stop_id 264:', trip);
-            }
-            return trip.stop_id === 264 && trip.stop_sequence === 1;
+            console.log('Vérification trip:', {
+                stop_id: trip.stop_id,
+                type: typeof trip.stop_id,
+                matches: trip.stop_id === '264',
+                sequence: trip.stop_sequence
+            });
+            
+            return trip.stop_id === '264' && trip.stop_sequence === '1'; // Changé en string
         });
 
         console.log(`Nombre total d'horaires trouvés pour l'arrêt Vert-Bois:`, filteredTrips.length);
-        if (filteredTrips.length > 0) {
-            console.log('Premier horaire trouvé:', filteredTrips[0]);
-        }
+        console.log('Premiers horaires trouvés:', filteredTrips.slice(0, 3));
 
         const result = {
             routeId: '4-13',
@@ -113,7 +116,6 @@ function parseGTFSData(stopTimes, routes) {
             }))
         };
 
-        console.log('Résultat final:', result);
         return result;
 
     } catch (error) {
