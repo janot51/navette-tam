@@ -81,14 +81,27 @@ function parseGTFSData(stopTimes, routes) {
             dynamicTyping: true 
         }).data;
 
-        const filteredTrips = parsedStopTimes.filter(trip => 
-            trip.stop_id === 264 && // Vert-Bois stop_id
-            trip.stop_sequence === 1 // Premier arrêt du trajet
-        );
+        console.log('Échantillon des données parsées:', parsedStopTimes.slice(0, 5));
+        console.log('Nombre total de stop times:', parsedStopTimes.length);
 
-        console.log(`Nombre total d'horaires trouvés: ${filteredTrips.length}`);
+        // Voir tous les stop_id uniques pour vérifier
+        const uniqueStopIds = [...new Set(parsedStopTimes.map(trip => trip.stop_id))];
+        console.log('Stop IDs uniques:', uniqueStopIds);
 
-        return {
+        // Filtrer avec des logs
+        const filteredTrips = parsedStopTimes.filter(trip => {
+            if (trip.stop_id === 264) {
+                console.log('Trouvé trip pour stop_id 264:', trip);
+            }
+            return trip.stop_id === 264 && trip.stop_sequence === 1;
+        });
+
+        console.log(`Nombre total d'horaires trouvés pour l'arrêt Vert-Bois:`, filteredTrips.length);
+        if (filteredTrips.length > 0) {
+            console.log('Premier horaire trouvé:', filteredTrips[0]);
+        }
+
+        const result = {
             routeId: '4-13',
             routeName: 'Vert-Bois → Université',
             stopTimes: filteredTrips.map(trip => ({
@@ -96,11 +109,16 @@ function parseGTFSData(stopTimes, routes) {
                 arrival_time: trip.arrival_time,
                 trip_id: trip.trip_id,
                 stop_sequence: trip.stop_sequence,
-                scheduled_time: trip.departure_time // Garder l'horaire théorique
+                scheduled_time: trip.departure_time
             }))
         };
+
+        console.log('Résultat final:', result);
+        return result;
+
     } catch (error) {
-        console.error('Erreur lors du parsing GTFS:', error);
+        console.error('Erreur détaillée lors du parsing GTFS:', error);
+        console.error('Stack:', error.stack);
         return [];
     }
 }
