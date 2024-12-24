@@ -6,6 +6,8 @@ const cron = require('node-cron');
 const fs = require('fs/promises');
 const Papa = require('papaparse');
 
+const VERT_BOIS_STOP_ID = 264; // ID de l'arrêt Vert-Bois
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 
@@ -108,40 +110,36 @@ app.get('/api/schedule', (req, res) => {
 
 // Fonctions utilitaires
 // Dans la fonction parseGTFSData
+
 function parseGTFSData(stopTimes, routes) {
-  console.log('Parsing des données GTFS...');
-  try {
-      // Parser les fichiers CSV
-      const parsedStopTimes = Papa.parse(stopTimes, { 
-          header: true, 
-          skipEmptyLines: true,
-          dynamicTyping: true
-      }).data;
+    console.log('Parsing des données GTFS...');
+    try {
+        const parsedStopTimes = Papa.parse(stopTimes, { 
+            header: true, 
+            skipEmptyLines: true,
+            dynamicTyping: true  // Convertit automatiquement les nombres
+        }).data;
 
-      // Filtrer les horaires pour la direction Vert-Bois → Université (NAVETTE A)
-      const navetteAStopTimes = parsedStopTimes.filter(stopTime => {
-          // Les trip_id sont de la forme 1582409252-1, 1582409251-1, etc.
-          const trip_id = stopTime.trip_id.toString();
-          return trip_id.startsWith('15824'); // Tous les trips de la navette commencent par 15824
-      });
+        // Filtrer uniquement les départs de Vert-Bois
+        const vertBoisDepartures = parsedStopTimes.filter(stopTime => 
+            stopTime.stop_id === VERT_BOIS_STOP_ID
+        );
 
-      console.log(`Nombre total d'horaires trouvés: ${navetteAStopTimes.length}`);
+        console.log(`Trouvé ${vertBoisDepartures.length} départs depuis Vert-Bois`);
 
-      // Trier les horaires
-      const sortedStopTimes = navetteAStopTimes.sort((a, b) => {
-          return a.departure_time.localeCompare(b.departure_time);
-      });
-
-      return {
-          routeId: '4-13',
-          routeName: 'Vert-Bois → Université',
-          stopTimes: sortedStopTimes
-      };
-  } catch (error) {
-      console.error('Erreur lors du parsing GTFS:', error);
-      console.error('Stack:', error.stack);
-      return [];
-  }
+        return {
+            routeId: '4-13',
+            routeName: 'Vert-Bois → Université',
+            stopTimes: vertBoisDepartures.map(departure => ({
+                departure_time: departure.departure_time,
+                arrival_time: departure.arrival_time,
+                trip_id: departure.trip_id
+            }))
+        };
+    } catch (error) {
+        console.error('Erreur lors du parsing GTFS:', error);
+        return [];
+    }
 }
 
 function processRealtimeData(feedMessage) {
