@@ -109,57 +109,39 @@ app.get('/api/schedule', (req, res) => {
 // Fonctions utilitaires
 // Dans la fonction parseGTFSData
 function parseGTFSData(stopTimes, routes) {
-    console.log('Parsing des données GTFS...');
-    try {
-        // Parser les fichiers CSV
-        const parsedStopTimes = Papa.parse(stopTimes, { header: true, skipEmptyLines: true }).data;
-        const parsedRoutes = Papa.parse(routes, { header: true, skipEmptyLines: true }).data;
+  console.log('Parsing des données GTFS...');
+  try {
+      // Parser les fichiers CSV
+      const parsedStopTimes = Papa.parse(stopTimes, { 
+          header: true, 
+          skipEmptyLines: true,
+          dynamicTyping: true
+      }).data;
 
-        console.log('Nombre total de routes:', parsedRoutes.length);
-        console.log('Nombre total d\'horaires:', parsedStopTimes.length);
+      // Filtrer les horaires pour la direction Vert-Bois → Université (NAVETTE A)
+      const navetteAStopTimes = parsedStopTimes.filter(stopTime => {
+          // Les trip_id sont de la forme 1582409252-1, 1582409251-1, etc.
+          const trip_id = stopTime.trip_id.toString();
+          return trip_id.startsWith('15824'); // Tous les trips de la navette commencent par 15824
+      });
 
-        // Trouver la Navette A
-        const navetteARoute = parsedRoutes.find(route => route.route_id === '4-13');
+      console.log(`Nombre total d'horaires trouvés: ${navetteAStopTimes.length}`);
 
-        if (!navetteARoute) {
-            console.log('ERREUR: Navette A non trouvée');
-            return [];
-        }
+      // Trier les horaires
+      const sortedStopTimes = navetteAStopTimes.sort((a, b) => {
+          return a.departure_time.localeCompare(b.departure_time);
+      });
 
-        console.log('Navette A trouvée:', navetteARoute);
-
-        // Afficher un échantillon des horaires pour debug
-        console.log('Échantillon des horaires:');
-        parsedStopTimes.slice(0, 5).forEach(stop => {
-            console.log('Horaire:', stop);
-        });
-
-        // Filtrer les horaires différemment
-        const navetteAStopTimes = parsedStopTimes.filter(stopTime => {
-            const isNavetteA = stopTime.trip_id && stopTime.trip_id.includes('13');
-            if (isNavetteA) {
-                console.log('Horaire trouvé:', stopTime);
-            }
-            return isNavetteA;
-        });
-
-        console.log(`Nombre d'horaires trouvés pour la Navette A: ${navetteAStopTimes.length}`);
-
-        // Renvoyer les horaires triés par heure
-        const sortedStopTimes = navetteAStopTimes.sort((a, b) => {
-            return a.arrival_time.localeCompare(b.arrival_time);
-        });
-
-        return {
-            routeId: '4-13',
-            routeName: navetteARoute.route_long_name,
-            stopTimes: sortedStopTimes
-        };
-    } catch (error) {
-        console.error('Erreur détaillée lors du parsing GTFS:', error);
-        console.error('Stack:', error.stack);
-        return [];
-    }
+      return {
+          routeId: '4-13',
+          routeName: 'Vert-Bois → Université',
+          stopTimes: sortedStopTimes
+      };
+  } catch (error) {
+      console.error('Erreur lors du parsing GTFS:', error);
+      console.error('Stack:', error.stack);
+      return [];
+  }
 }
 
 function processRealtimeData(feedMessage) {
@@ -195,36 +177,43 @@ function processRealtimeData(feedMessage) {
 }
 
 function combineStaticAndRealtime(staticData, realtimeData) {
-    console.log('Combinaison des données...');
-    try {
-        const now = new Date();
-        const twoHoursLater = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+  console.log('Combinaison des données...');
+  try {
+      const now = new Date();
+      now.setSeconds(0); // Ignorer les secondes pour la comparaison
+      const twoHoursLater = new Date(now.getTime() + 2 * 60 * 60 * 1000);
 
-        // Filtrer les horaires pour les 2 prochaines heures
-        const relevantStopTimes = staticData.stopTimes.filter(stopTime => {
-            const stopTimeDate = new Date(stopTime.arrival_time);
-            return stopTimeDate >= now && stopTimeDate <= twoHoursLater;
-        });
+      console.log(`Filtrage des horaires entre ${now.toLocaleTimeString()} et ${twoHoursLater.toLocaleTimeString()}`);
 
-        // Ajouter les informations temps réel
-        const combinedData = relevantStopTimes.map(stopTime => {
-            const realtimeInfo = realtimeData[stopTime.trip_id] || {};
-            return {
-                ...stopTime,
-                realtime: {
-                    delay: realtimeInfo.delay || 0,
-                    status: realtimeInfo.currentStatus || 'SCHEDULED',
-                    lastUpdate: realtimeInfo.timestamp
-                }
-            };
-        });
-        console.log(combinedData);
-        console.log(`Données combinées pour ${combinedData.length} arrêts`);
-        return combinedData;
-    } catch (error) {
-        console.error('Erreur lors de la combinaison des données:', error);
-        return [];
-    }
+      // Convertir les heures en format 24h
+      const currentTime = now.getHours().toString().padStart(2, '0') + ':' + 
+                       now.getMinutes().toString().padStart(2, '0');
+
+      // Filtrer les horaires pour les 2 prochaines heures
+      const relevantStopTimes = staticData.stopTimes.filter(stopTime => {
+          const departureTime = stopTime.departure_time.split(':').slice(0, 2).join(':');
+          return departureTime >= currentTime;
+      }).slice(0, 10); // Garder les 10 prochains départs
+
+      console.log(`Nombre d'horaires filtrés: ${relevantStopTimes.length}`);
+
+      const combinedData = relevantStopTimes.map(stopTime => ({
+          arrival_time: stopTime.arrival_time,
+          departure_time: stopTime.departure_time,
+          stop_id: stopTime.stop_id,
+          realtime: {
+              delay: 0, // On initialise sans retard pour le moment
+              status: 'SCHEDULED',
+              lastUpdate: new Date().toISOString()
+          }
+      }));
+
+      console.log('Données combinées:', combinedData);
+      return combinedData;
+  } catch (error) {
+      console.error('Erreur lors de la combinaison des données:', error);
+      return [];
+  }
 }
 
 // Chargement initial des données
